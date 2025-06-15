@@ -1,0 +1,8 @@
+[
+ 
+    { // urq_jump - прыжки по коду
+        "keys": ["f1"],
+        "command": "urq_jump",
+        "context": [ { "key": "selector", "operator": "equal", "operand": "source.urql" } ]        
+    },
+]
