@@ -68,6 +68,28 @@ proc странное место                         ← или здесь
 
 Символ `|` указывает куда скрипт поставит курсор. Можно отредактировать под свои вкусы. Если сразу не заработало - перезапустить Sublime.
 
+## Возможные проблемы
+
+Если скрипт не работает по горячей клавише, то установите подсветку для urql или удалите/закомментируйте строчку 
+
+```json
+        "context": [ { "key": "selector", "operator": "equal", "operand": "source.urql" } ]  
+```
+
+из `Default.sublime-keymap` в папке `urq_jump`:
+
+```json
+[
+ 
+    { 
+        "keys": ["f1"],
+        "command": "urq_jump",
+        // "context": [ { "key": "selector", "operator": "equal", "operand": "source.urql" } ]                
+    },
+]
+```
+
+
 ---
 [Короткое видео](https://plut.info/upload/f1.mp4)  
 ---
