@@ -69,7 +69,7 @@ LOC_TEMPLATE = """
 
 ---
 
-![goofy gif](https://plut.info/upload/f1-5.gif)
+https://plut.info/upload/f1.mp4
 
 ---
 
