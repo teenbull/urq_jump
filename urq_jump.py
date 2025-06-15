@@ -1,7 +1,10 @@
 # coding: utf-8
 import sublime, sublime_plugin, re, os
 
-# Шаблон для создания новой локации с курсором на позиции |
+# Файл шаблона
+TEMPLATE_FILE = 'loc.txt'
+
+# Шаблон по умолчанию для создания новой локации с курсором на позиции |
 LOC_TEMPLATE = """
 :{} 
     pln | 
@@ -9,16 +12,37 @@ LOC_TEMPLATE = """
 """
 
 # Паттерны для поиска ссылок на локации в разных форматах:
-# 1. [[link|text]] - викиссылка с текстом
-# 2. [[link]] - простая викиссылка  
-# 3. btn название - кнопка
-# 4. goto/proc название - переход/процедура (останавливается перед else/&/;/*)
 LINK_PATTERNS = [
-    {'rx': re.compile(r'\[\[([^|\]]+)\|([^|\]]+)\]\]'), 'grp': 2},
-    {'rx': re.compile(r'\[\[([^|\]]+)\]\]'), 'grp': 1},
-    {'rx': re.compile(r'\bbtn\s+([^,;&\s]+(?:\s+[^,;&\s]+)*)'), 'grp': 1},
-    {'rx': re.compile(r'\b(?:goto|proc)\s+([^;&/*]+?)(?=\s+else\b|\s*[;&]|\s*/\*|$)'), 'grp': 1},  # Фикс: захват до else/&/;/*
+    {'rx': re.compile(r'\[\[([^|\]]+)\|([^|\]]+)\]\]'), 'grp': 2},                                  # [[text|link]] - тви-ссылка с текстом
+    {'rx': re.compile(r'\[\[([^|\]]+)\]\]'), 'grp': 1},                                             # [[link]] - простая тви-ссылка  
+    {'rx': re.compile(r'\bbtn\s+([^,;&\s]+(?:\s+[^,;&\s]+)*)'), 'grp': 1},                          # btn link, text
+    {'rx': re.compile(r'\b(?:goto|proc)\s+([^;&/*]+?)(?=\s+else\b|\s*[;&]|\s*/\*|$)'), 'grp': 1},   # goto/proc link захват до else/&/;/*
 ]
+
+
+# Загружает шаблон из loc.txt рядом со скриптом
+def get_template():
+    script_dir = os.path.dirname(__file__)
+    template_path = os.path.join(script_dir, TEMPLATE_FILE)
+    
+    try:
+        # Список кодировок для проверки
+        encodings = ['utf-8', 'cp1251']
+        
+        for encoding in encodings:
+            try:
+                with open(template_path, 'r', encoding=encoding) as f:
+                    return f.read()
+            except UnicodeDecodeError:
+                continue
+        
+        # Если ни одна кодировка не подошла
+        return LOC_TEMPLATE
+        
+    except FileNotFoundError:
+        return LOC_TEMPLATE  # Fallback шаблон
+    except Exception:
+        return LOC_TEMPLATE  # Fallback шаблон
 
 # Проверяет валидность выделенного текста для использования как имя локации
 def _valid_sel(txt): 
@@ -27,26 +51,11 @@ def _valid_sel(txt):
     if not t or ':' in t or '&' in t or '/*' in t: return False
     return True
 
-# Проверяет что текст не является системным словом/оператором
-def _valid_word(txt):
-    if not txt: return False
-    t = txt.strip().lower()
-    # Системные операторы и ключевые слова
-    keywords = {'and', 'or', 'if', 'else', 'then', 'btn', 'pln', 'end', 'goto', 'proc', 'act'}
-    if t in keywords: return False
-    # Математические и логические операторы
-    if t in {'*', '+', '-', '/', '\\', '|', '<', '>', '=', '<>', '==', '!=', '<=', '>='}: return False
-    # Скобки и знаки препинания
-    if t in {'(', ')', '[', ']', '{', '}', ',', '.', ';', ':', '?', '!'}: return False
-    # Проверка на $ как часть переменной
-    if t == '$': return False
-    return True
-
 # Проверяет наличие переменных в тексте (шаблоны типа #var$, ##var$, #%var$)
 def _has_vars(txt): return bool(re.search(r'#[#%]?[^$]*\$', txt))
 
 # Очищает строку от комментариев и разбивает по & и ;
-# Возвращает часть строки где находится курсор и скорректированную позицию
+# Возвращает часть строки, где находится курсор и скорректированную позицию
 def clean_line(ln, pos):
     ln = re.sub(r'/\*.*?\*/', '', ln); sc = ln.find(';')  # Убираем /* комменты */ и находим ;
     if sc >= 0 and pos > sc: return "", pos  # Если курсор после ; - пустая строка
@@ -92,15 +101,16 @@ def get_sel(v, pt):
         link = find_link(clean, cpos)  # Ищем ссылку
         if link: return link
     
-    # Последний шанс - слово под курсором (с проверкой на системные слова)
-    # wr = v.word(pt)
-    # if wr and not wr.empty():
-    #     txt = v.substr(wr).strip()
-    #     if _valid_sel(txt) and _valid_word(txt): return txt  # Дополнительная проверка на системные слова
     return None
 
-# Показывает сообщение в статусбаре с количеством локаций
-def msg(txt, v): sublime.status_message(f"{txt}. Locs: {len(v.find_all(':', 0))}")
+# Константа для поиска меток
+LOC_PATTERN = re.compile(r'^[ \t]*:', re.MULTILINE)
+
+
+def msg(txt, v): 
+    text = v.substr(sublime.Region(0, v.size()))
+    matches = LOC_PATTERN.findall(text)    
+    sublime.status_message(f"{txt}. Locs: {len(matches)}")
 
 class UrqJumpCommand(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -138,7 +148,8 @@ class UrqJumpCommand(sublime_plugin.TextCommand):
         prefix = '\n' if need_newline else ''
         
         # Вставляем шаблон новой локации
-        tmpl = prefix + LOC_TEMPLATE.format(txt)
+        # tmpl = prefix + LOC_TEMPLATE.format(txt)
+        tmpl = prefix + get_template().format(txt)
         cursor_offset = tmpl.find('|')  # Находим позицию курсора в шаблоне
         if cursor_offset != -1:
             tmpl = tmpl.replace('|', '')  # Убираем маркер курсора
