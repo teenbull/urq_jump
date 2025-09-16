@@ -163,9 +163,9 @@ class UrqJumpCommand(sublime_plugin.TextCommand):
     
     # Команда активна только для .qst и .txt файлов
     def is_enabled(self):
-        return (self.view and 
-                self.view.file_name() and 
-                self.view.file_name().lower().endswith(('.qst', '.txt')))       
+        return bool(self.view and 
+                    self.view.file_name() and 
+                    self.view.file_name().lower().endswith(('.qst', '.txt')))  
         # return "urql" in os.path.basename(self.view.settings().get('syntax', '')).lower()
 
     def description(self): return "URQ Jump/Create Location"
